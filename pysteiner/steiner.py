@@ -1,6 +1,6 @@
+import random
 import numpy as np
 import pyvista as pv
-import random
 
 # pv.global_theme.return_cpos = True
 
@@ -54,7 +54,7 @@ def Steiner(
         kwargs -- named arguments passed to `add_mesh`, e.g. color="red"
 
     """
-    if not ("actors" in locals()):
+    if not "actors" in locals():
         actors = []
     depth = len(n)
     invphi = 1 / phi
@@ -131,14 +131,14 @@ def SteinerMovie(
         n -- list of integers, the number of balls at each level
 
         phi -- controls the shape of the figure
-        
+
         cameraPosition -- list of coordinates of the camera position
-        
+
         bgcolor -- background color
-        
+
         nframes -- number of frames of the gif
-        
-        gifpath -- path to the gif to be created; if `None` (default), a 
+
+        gifpath -- path to the gif to be created; if `None` (default), a
         file name is generated in the current folder
 
         kwargs -- named arguments passed to `add_mesh`, e.g. color="red"
@@ -146,7 +146,7 @@ def SteinerMovie(
     """
     pv.global_theme.background = bgcolor
     plotter = pv.Plotter(notebook=False, off_screen=True)
-    if gifpath == None:
+    if gifpath is None:
         gifpath = f"Steiner_{n[0]}"
         for k in tail(n):
             gifpath = f"{gifpath}-{k}"
@@ -195,5 +195,5 @@ def SteinerMovie(
 #     img, *imgs = [Image.open(f) for f in tmpfiles]
 #     img.save(gifpath, format="GIF", append_images=imgs,
 #          save_all=True, duration=duration, loop=0)
-# 
+#
 # SteinerMovie([3,3,5], 0.2, nframes=50, duration=20, smooth_shading=True, specular=3, color="lime")
