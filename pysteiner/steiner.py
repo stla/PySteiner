@@ -30,6 +30,20 @@ def tail(x):
     return y
 
 
+def cyclideMesh(mu, a, c):
+    angle = np.linspace(0, 2*np.pi, 100) 
+    u, v = np.meshgrid(angle, angle)
+    b = np.sqrt(a * a - c * c)
+    cosu = np.cos(u)
+    cosv = np.cos(v)
+    h = a - c * cosu * cosv
+    x = (mu * (c - a * cosu * cosv) + b * b * cosu) / h
+    y = (b * np.sin(u) * (a - mu * cosv)) / h
+    z = b * np.sin(v) * (c * cosu - mu) / h
+    grid = pv.StructuredGrid(x, y, z)
+    return grid.extract_geometry().clean(tolerance=1e-6)
+
+
 # n: list of integers, the numbers of spheres at each step
 # -1 < phi < 1, phi != 0
 def Steiner(
@@ -68,6 +82,15 @@ def Steiner(
     O1 = vec2(O1x, 0.0)
     CRadius = Coef * radius
     CSide = CRadius * sine
+    if depth == 1:
+        circle = iotaCircle(I-Center, k, np.array([0,0]), CRadius - CSide)
+        mu = (radius - circle["radius"]) / 2
+        a = (radius + circle["radius"]) / 2
+        c = (circle["center"][0] - O1x) / 2
+        pt = Center + circle["center"] / 2
+        mesh = cyclideMesh(mu, a, c)
+        mesh.translate((pt[0]-O1x/2, pt[1], 0))
+        _ = plotter.add_mesh(mesh, color="#FFFF00", opacity=0.2)
     for i in range(int(m)):
         beta = (i + 1 + shift) * 2 * np.pi / m
         pti = vec2(CRadius * np.cos(beta), CRadius * np.sin(beta)) + Center
@@ -85,19 +108,19 @@ def Steiner(
     return actors
 
 
-# plotter = pv.Plotter()
-# _ = Steiner(
-#     plotter,
-#     [3, 3, 5],
-#     phi=0.25,
-#     shift=0.4,  # Center=vec2(5,6), radius=5,
-#     smooth_shading=True,
-#     specular=3,
-#     color="purple",
-#     )
-# #print(plotter.camera_position)
-# plotter.set_position([0, 0, 13])
-# plotter.show()
+plotter = pv.Plotter()
+_ = Steiner(
+    plotter,
+    [3, 3, 5],
+    phi=0.25,
+    shift=0.4,  # Center=vec2(5,6), radius=5,
+    smooth_shading=True,
+    specular=3,
+    color="purple"
+    )
+#print(plotter.camera_position)
+plotter.set_position([0, 0, 13])
+plotter.show()
 
 # plotter = pv.Plotter()
 # def steiner_shift(shift):
