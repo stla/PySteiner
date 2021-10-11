@@ -47,7 +47,8 @@ def cyclideMesh(mu, a, c):
 # n: list of integers, the numbers of spheres at each step
 # -1 < phi < 1, phi != 0
 def Steiner(
-    plotter, n, phi, shift=0, Center=np.zeros((2)), radius=2, epsilon=0.005, **kwargs
+    plotter, n, phi, shift=0, Center=np.zeros((2)), radius=2, 
+    epsilon=0.004, cyclide=True, **kwargs
 ):
     """
     Add a nested Steiner chain to a pyvista plotter region.
@@ -64,6 +65,10 @@ def Steiner(
         Center -- location parameter of the figure
 
         radius -- scale parameter of the figure
+        
+        epsilon -- small positive float to reduce the radii of the balls
+        
+        cyclide -- whether to plot the enveloping cyclides
 
         kwargs -- named arguments passed to `add_mesh`, e.g. color="red"
 
@@ -82,7 +87,7 @@ def Steiner(
     O1 = vec2(O1x, 0.0)
     CRadius = Coef * radius
     CSide = CRadius * sine
-    if depth == 1:
+    if cyclide and depth == 1:
         circle = iotaCircle(I-Center, k, np.array([0,0]), CRadius - CSide)
         mu = (radius - circle["radius"]) / 2
         a = (radius + circle["radius"]) / 2
@@ -90,7 +95,11 @@ def Steiner(
         pt = Center + circle["center"] / 2
         mesh = cyclideMesh(mu, a, c)
         mesh.translate((pt[0]-O1x/2, pt[1], 0))
-        _ = plotter.add_mesh(mesh, color="#FFFF00", opacity=0.2)
+        actr = random.randint(0, 1e16)
+        actors.append(actr)
+        _ = plotter.add_mesh(
+            mesh, color="#FFFF00", opacity=0.2, specular=4, name=f"actor_{actr}"
+        )
     for i in range(int(m)):
         beta = (i + 1 + shift) * 2 * np.pi / m
         pti = vec2(CRadius * np.cos(beta), CRadius * np.sin(beta)) + Center
@@ -99,28 +108,28 @@ def Steiner(
         r = cc["radius"]
         if depth == 1:
             sph = Sphere(center, r - epsilon)
-            a = random.randint(0, 1e15)
-            actors.append(a)
-            _ = plotter.add_mesh(sph, name=f"actor_{a}", **kwargs)
+            actr = random.randint(0, 1e16)
+            actors.append(actr)
+            _ = plotter.add_mesh(sph, name=f"actor_{actr}", **kwargs)
         elif depth > 1:
             actrs = Steiner(plotter, tail(n), phi, -shift, center, r, epsilon, **kwargs)
             actors = actors + actrs
     return actors
 
 
-plotter = pv.Plotter()
-_ = Steiner(
-    plotter,
-    [3, 3, 5],
-    phi=0.25,
-    shift=0.4,  # Center=vec2(5,6), radius=5,
-    smooth_shading=True,
-    specular=3,
-    color="purple"
-    )
-#print(plotter.camera_position)
-plotter.set_position([0, 0, 13])
-plotter.show()
+# plotter = pv.Plotter()
+# _ = Steiner(
+#     plotter,
+#     [3, 3, 5],
+#     phi=0.25,
+#     shift=0.4,  # Center=vec2(5,6), radius=5,
+#     smooth_shading=True,
+#     specular=3,
+#     color="purple"
+#     )
+# #print(plotter.camera_position)
+# #plotter.set_position([0, 0, 13])
+# plotter.show()
 
 # plotter = pv.Plotter()
 # def steiner_shift(shift):
