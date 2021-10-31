@@ -7,3 +7,5 @@ Draw nested 3D Steiner chains.
 ![](https://github.com/stla/PySteiner/raw/main/examples/Steiner_6-6.gif)
 
 ![](https://github.com/stla/PySteiner/raw/main/examples/Steiner_3-3-5.gif)
+
+See also [PyPlaneGeometry](https://github.com/stla/PyPlaneGeometry).
