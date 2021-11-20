@@ -173,10 +173,14 @@ def Steiner(
             translation = np.asarray(translation)
             psi_ = np.linspace(0, 2*np.pi, 13)[:12]
             for psi in psi_:
+                actr = random.randint(0, 1e16)
+                actors.append(actr)
                 vill1 = vcircle(mu, a, c, rv, psi, -1, translation)
-                _ = plotter.add_mesh(vill1, color="red")
+                _ = plotter.add_mesh(vill1, color="darkred", name=f"actor_{actr}")
+                actr = random.randint(0, 1e16)
+                actors.append(actr)
                 vill2 = vcircle(mu, a, c, rv, psi, 1, translation)
-                _ = plotter.add_mesh(vill2, color="red")
+                _ = plotter.add_mesh(vill2, color="darkred", name=f"actor_{actr}")
     for i in range(int(m)):
         beta = (i + 1 + shift) * 2 * np.pi / m
         pti = vec2(CRadius * np.cos(beta), CRadius * np.sin(beta)) + Center
@@ -229,6 +233,9 @@ def Steiner(
 def SteinerMovie(
     n,
     phi,
+    cyclide = False,
+    villarceau = False,
+    rv = 0.01,
     cameraPosition=[0, 0, 10],
     bgcolor="white",
     nframes=50,
@@ -264,7 +271,10 @@ def SteinerMovie(
         gifpath = f"{gifpath}.gif"
     plotter.open_gif(gifpath)
     for shift in np.linspace(0, 1, nframes + 1)[:nframes]:
-        s = Steiner(plotter, n, phi=phi, shift=shift, **kwargs)
+        s = Steiner(
+            plotter, n, phi=phi, shift=shift, cyclide=cyclide, 
+            villarceau=villarceau, rv=rv, **kwargs
+        )
         plotter.set_position(cameraPosition)
         plotter.write_frame()
         for a in s:
