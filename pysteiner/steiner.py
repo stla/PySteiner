@@ -1,12 +1,19 @@
+from math import sqrt, sin, cos
 import random
 import numpy as np
 import pyvista as pv
-
 # pv.global_theme.return_cpos = True
 
 
 def Sphere(center, radius):
     return pv.Sphere(radius, np.append(center, 0))
+  
+def Circle(center, radius, normal, r):
+    polygon = pv.Polygon(center, radius, normal, n_sides=360)
+    pts0 = polygon.points
+    pts = np.vstack((pts0, pts0[0,:]))
+    spline = pv.Spline(pts, 1000)
+    return spline.tube(radius=r)
 
 
 # image of circle (center, radius) by the inversion
@@ -44,11 +51,67 @@ def cyclideMesh(mu, a, c):
     return grid.extract_geometry().clean(tolerance=1e-6)
 
 
+# plane passing by points p1, p2, p3 #
+def plane3pts(p1, p2, p3):
+    xcoef = (p1[1] - p2[1]) * (p2[2] - p3[2]) - (p1[2] - p2[2]) * (p2[1] - p3[1])
+    ycoef = (p1[2] - p2[2]) * (p2[0] - p3[0]) - (p1[0] - p2[0]) * (p2[2] - p3[2])
+    zcoef = (p1[0] - p2[0]) * (p2[1] - p3[1]) - (p1[1] - p2[1]) * (p2[0] - p3[0])
+    offset = p1[0] * xcoef + p1[1] * ycoef + p1[2] * zcoef
+    return np.array([xcoef, ycoef, zcoef, offset])
+
+
+# center, radius and normal of the circle passing by three points #
+def circleCenterAndRadius(p1, p2, p3):
+    p12 = (p1 + p2) / 2
+    p23 = (p2 + p3) / 2
+    v12 = p2 - p1
+    v23 = p3 - p2
+    plane = plane3pts(p1, p2, p3)
+    A = np.column_stack((plane[0:3], v12, v23))
+    b = np.array([plane[3], np.vdot(p12, v12), np.vdot(p23, v23)])
+    center = np.matmul(np.linalg.inv(np.transpose(A)), b)
+    r = np.linalg.norm(p1 - center)
+    normal = plane[0:3] / np.linalg.norm(plane[0:3])
+    return dict(center=center, radius=r, normal=normal)
+
+
+# parametrization of Villarceau circles ####
+def villarceau_point(mu, a, c, theta, psi, epsilon):
+    b = sqrt(a*a-c*c)
+    bb = b*sqrt(mu*mu-c*c)
+    bb2 = b*b*(mu*mu-c*c)
+    denb1 = c*(a*c-mu*c+c*c-a*mu-bb)
+    b1 = (a*mu*(c-mu)*(a+c)-bb2+c*c+bb*(c*(a-mu+c)-2*a*mu))/denb1
+    denb2 = c*(a*c-mu*c-c*c+a*mu+bb)
+    b2 = (a*mu*(c+mu)*(a-c)+bb2-c*c+bb*(c*(a-mu-c)+2*a*mu))/denb2
+    omegaT = (b1+b2)/2
+    d = (a-c)*(mu-c)+bb
+    r = c*c*(mu-c)/((a+c)*(mu-c)+bb)/d
+    R = c*c*(a-c)/((a-c)*(mu+c)+bb)/d
+    omega2 = (a*mu + bb)/c
+    sign = 1 if epsilon > 0 else -1
+    f1 = -sqrt(R*R-r*r)*sin(theta)
+    f2 = sign*(r+R*cos(theta))
+    x1 = f1*cos(psi) + f2*sin(psi) + omegaT
+    y1 = f1*sin(psi) - f2*cos(psi)
+    z1 = r*sin(theta)
+    den = (x1-omega2)**2+y1*y1+z1*z1
+    return np.array([omega2 + (x1-omega2)/den, y1/den, z1/den])
+
+# Villarceau circle as mesh (tube) ####
+def vcircle(mu, a, c, r, psi, sign, shift):
+    p1 = villarceau_point(mu, a, c, 0, psi, sign) + shift
+    p2 = villarceau_point(mu, a, c, 2, psi, sign) + shift
+    p3 = villarceau_point(mu, a, c, 4, psi, sign) + shift
+    circ = circleCenterAndRadius(p1, p2, p3)
+    return Circle(circ["center"], circ["radius"], circ["normal"], r)
+
+
 # n: list of integers, the numbers of spheres at each step
 # -1 < phi < 1, phi != 0
 def Steiner(
     plotter, n, phi, shift=0, Center=np.zeros((2)), radius=2, 
-    epsilon=0.004, cyclide=True, **kwargs
+    epsilon=0.004, cyclide=True, villarceau=False, rv=0.02, **kwargs
 ):
     """
     Add a nested Steiner chain to a pyvista plotter region.
@@ -69,6 +132,10 @@ def Steiner(
         epsilon -- small positive float to reduce the radii of the balls
         
         cyclide -- whether to plot the enveloping cyclides
+        
+        villarceau -- whether to plot the enveloping Villarceau circles
+        
+        rv -- Villarceau circles actually are thin tori; this parameter is the minor radius
 
         kwargs -- named arguments passed to `add_mesh`, e.g. color="red"
 
@@ -87,19 +154,29 @@ def Steiner(
     O1 = vec2(O1x, 0.0)
     CRadius = Coef * radius
     CSide = CRadius * sine
-    if cyclide and depth == 1:
+    if (cyclide or villarceau) and depth == 1:
         circle = iotaCircle(I-Center, k, np.array([0,0]), CRadius - CSide)
         mu = (radius - circle["radius"]) / 2
         a = (radius + circle["radius"]) / 2
         c = (circle["center"][0] - O1x) / 2
         pt = Center + circle["center"] / 2
-        mesh = cyclideMesh(mu, a, c)
-        mesh.translate((pt[0]-O1x/2, pt[1], 0))
-        actr = random.randint(0, 1e16)
-        actors.append(actr)
-        _ = plotter.add_mesh(
-            mesh, color="#FFFF00", opacity=0.2, specular=4, name=f"actor_{actr}"
-        )
+        translation = (pt[0]-O1x/2, pt[1], 0)
+        if cyclide:
+            mesh = cyclideMesh(mu, a, c)
+            mesh.translate(translation)
+            actr = random.randint(0, 1e16)
+            actors.append(actr)
+            _ = plotter.add_mesh(
+                mesh, color="#FFFF00", opacity=0.2, specular=4, name=f"actor_{actr}"
+            )
+        if villarceau:
+            translation = np.asarray(translation)
+            psi_ = np.linspace(0, 2*np.pi, 13)[:12]
+            for psi in psi_:
+                vill1 = vcircle(mu, a, c, rv, psi, -1, translation)
+                _ = plotter.add_mesh(vill1, color="red")
+                vill2 = vcircle(mu, a, c, rv, psi, 1, translation)
+                _ = plotter.add_mesh(vill2, color="red")
     for i in range(int(m)):
         beta = (i + 1 + shift) * 2 * np.pi / m
         pti = vec2(CRadius * np.cos(beta), CRadius * np.sin(beta)) + Center
@@ -112,10 +189,12 @@ def Steiner(
             actors.append(actr)
             _ = plotter.add_mesh(sph, name=f"actor_{actr}", **kwargs)
         elif depth > 1:
-            actrs = Steiner(plotter, tail(n), phi, -shift, center, r, epsilon, **kwargs)
+            actrs = Steiner(
+              plotter, tail(n), phi, -shift, center, r, epsilon, 
+              cyclide, villarceau, rv, **kwargs
+            )
             actors = actors + actrs
     return actors
-
 
 # plotter = pv.Plotter()
 # _ = Steiner(
