@@ -158,7 +158,10 @@ def SteinerStarsMovie(
 
     """
     pv.global_theme.background = bgcolor
-    plotter = pv.Plotter(notebook=False, off_screen=True)
+    plotter = pv.Plotter(
+        window_size=[512,512], notebook=False, off_screen=True
+    )
+    plotter.add_background_image("SpaceBackground.png")
     if gifpath is None:
         gifpath = f"SteinerStars_{n[0]}"
         for k in tail(n):
