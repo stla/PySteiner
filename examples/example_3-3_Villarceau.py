@@ -1,12 +1,12 @@
 from pysteiner.steiner import Steiner, SteinerMovie
 import pyvista as pv
 
-# pltr = pv.Plotter()
-# Steiner(
-#   pltr, [3,3], 0.05, 0, cyclide=False, villarceau=True, rv=0.025, 
-#   smooth_shading=True, color="purple", specular=10
-# )
-# pltr.show()
+pltr = pv.Plotter()
+Steiner(
+  pltr, [3,3], 0.05, 0, cyclide=False, villarceau=True, rv=0.025, 
+  smooth_shading=True, color="purple", specular=0.8
+)
+pltr.show()
 
 SteinerMovie(
         [3, 3], 
