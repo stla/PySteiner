@@ -1,4 +1,4 @@
-from math import sqrt, sin, cos
+import functools
 import random
 import numpy as np
 import pyvista as pv
@@ -21,9 +21,10 @@ def f_icosahedral_star(x, y, z, a):
     return (1 - u) ** 3 + a * u**3 + a * v
 
 
-def Star(center, fscale):
+@functools.cache
+def Star0():
     # generate data grid for computing the values
-    X, Y, Z = np.mgrid[(-0.75):0.75:250j, (-0.75):0.75:250j, (-0.75):0.75:250j]
+    X, Y, Z = np.mgrid[(-0.75):0.75:300j, (-0.75):0.75:300j, (-0.75):0.75:300j]
     # create a structured grid
     grid = pv.StructuredGrid(X, Y, Z)
     # compute and assign the values
@@ -31,11 +32,10 @@ def Star(center, fscale):
     values = f_icosahedral_star(X, Y, Z, a)
     grid.point_data["values"] = values.ravel(order="F")
     isosurf = grid.contour(isosurfaces=[0])
-    mesh = isosurf.extract_geometry()
-    mesh1 = mesh.scale(fscale)
-    translation = np.append(center, 0)
-    mesh2 = mesh1.translate(translation)
-    return mesh2
+    mesh = isosurf.extract_geometry().scale(4.0/3.0)
+    dists = np.linalg.norm(mesh.points, axis=1)
+    mesh['dist'] = (dists - dists.min()) / (dists.max() - dists.min())
+    return mesh
 
 
 # image of circle (center, radius) by the inversion
@@ -85,8 +85,6 @@ def SteinerStars(
     """
     if not "actors" in locals():
         actors = []
-    if not "Star0" in locals():
-        Star0 = Star((0,0), 4.0/3.0)
     depth = len(n)
     invphi = 1 / phi
     roverphi = radius * invphi
@@ -106,10 +104,21 @@ def SteinerStars(
         center = cc["center"] - O1
         r = cc["radius"]
         if depth == 1:
-            star = Star0.scale(r).translate(np.append(center, 0))
+            star = Star0().scale(r).translate(np.append(center, 0))
             actr = random.randint(0, 1e16)
             actors.append(actr)
-            _ = plotter.add_mesh(star, name=f"actor_{actr}", **kwargs)
+            _ = plotter.add_mesh(
+                    star, 
+                    name=f"actor_{actr}", 
+                    scalars = star['dist'],
+                    smooth_shading=True,
+                    specular=0.2,
+                    cmap="turbo",
+                    log_scale=False,
+                    show_scalar_bar=False,
+                    flip_scalars=False,
+                    **kwargs
+                )
         elif depth > 1:
             actrs = SteinerStars(
               plotter, tail(n), phi, -shift, center, r, **kwargs
@@ -151,7 +160,7 @@ def SteinerStarsMovie(
     pv.global_theme.background = bgcolor
     plotter = pv.Plotter(notebook=False, off_screen=True)
     if gifpath is None:
-        gifpath = f"Steiner_{n[0]}"
+        gifpath = f"SteinerStars_{n[0]}"
         for k in tail(n):
             gifpath = f"{gifpath}-{k}"
         gifpath = f"{gifpath}.gif"
